@@ -70,6 +70,7 @@ namespace Renderer
   void ReleaseTexture( Texture * tex );
   
   void CopyBackbufferToTexture(Texture * tex);
+  Texture *GetFeedbackTexture();
 
   struct Vertex
   {

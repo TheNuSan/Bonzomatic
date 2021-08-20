@@ -130,6 +130,7 @@ namespace Renderer
     "uniform sampler1D texFFTSmoothed; // this one has longer falloff and less harsh transients\n"
     "uniform sampler1D texFFTIntegrated; // this is continually increasing\n"
     "uniform sampler2D texPreviousFrame; // screenshot of the previous frame\n"
+    "uniform sampler2D texFeedback; // value written to feedback_value in previous frame\n"
     "{%textures:begin%}" // leave off \n here
     "uniform sampler2D {%textures:name%};\n"
     "{%textures:end%}" // leave off \n here
@@ -138,6 +139,7 @@ namespace Renderer
     "{%midi:end%}" // leave off \n here
     "\n"
     "layout(location = 0) out vec4 out_color; // out_color must be written in order to see anything\n"
+    "layout(location = 1) out vec4 feedback_value; // value that will be available in texFeedback in the next frame\n"
     "\n"
     "vec4 plas( vec2 v, float time )\n"
     "{\n"
@@ -175,9 +177,22 @@ namespace Renderer
   GLuint glhGUIVA = 0;
   GLuint glhGUIProgram = 0;
 
+  static GLuint glhFramebuffers[2] = {0};
+  static GLuint glhRenderbuffers[2] = {0};
+  static int currentFramebuffer = 0;
+
   int nWidth = 0;
   int nHeight = 0;
   bool nSizeChanged = false;
+
+  struct GLTexture : public Texture
+  {
+    GLuint ID;
+    int unit;
+  };
+
+  int textureUnit = 0;
+  static GLTexture frameTextures[2];
 
   void MatrixOrthoOffCenterLH(float * pout, float l, float r, float b, float t, float zn, float zf)
   {
@@ -274,7 +289,7 @@ namespace Renderer
       nWidth = settings->nWidth;
       nHeight = settings->nHeight;
 
-      glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);      
+      glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
     }
 
     std::string finalWindowName = "BONZOMATIC - GLFW" + windowName;
@@ -457,7 +472,7 @@ namespace Renderer
     AllocateBuffers();
 
     glViewport(0, 0, nWidth, nHeight);
-    
+
     run = true;
 
     return true;
@@ -599,20 +614,72 @@ namespace Renderer
     nWidth = width;
     nHeight = height;
     nSizeChanged = true;
-    if (pboSize < nWidth*nHeight) {
-      AllocateBuffers();
-    }
+    AllocateBuffers();
   }
 
   void AllocateBuffers()
   {
-    pboSize = nWidth * nHeight;
-    glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo[0]);
-    glBufferData(GL_PIXEL_PACK_BUFFER, pboSize * sizeof(unsigned int), NULL, GL_STREAM_READ);
-    glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo[1]);
-    glBufferData(GL_PIXEL_PACK_BUFFER, pboSize * sizeof(unsigned int), NULL, GL_STREAM_READ);
-    //unbind buffers for now
-    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    if (pboSize < nWidth*nHeight)
+    {
+      pboSize = nWidth * nHeight;
+      glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo[0]);
+      glBufferData(GL_PIXEL_PACK_BUFFER, pboSize * sizeof(unsigned int), NULL, GL_STREAM_READ);
+      glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo[1]);
+      glBufferData(GL_PIXEL_PACK_BUFFER, pboSize * sizeof(unsigned int), NULL, GL_STREAM_READ);
+      //unbind buffers for now
+      glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    }
+
+    if (!glhFramebuffers[0])
+    {
+      glDeleteFramebuffers(2, glhFramebuffers);
+      glDeleteRenderbuffers(2, glhRenderbuffers);
+    }
+
+    // Create ping-pong framebuffers
+    glGenFramebuffers(2, glhFramebuffers);
+    glGenRenderbuffers(2, glhRenderbuffers);
+    for (int i = 0; i < 2; ++i)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, glhFramebuffers[i]);
+
+        glBindRenderbuffer(GL_RENDERBUFFER, glhRenderbuffers[i]);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_SRGB8_ALPHA8, nWidth, nHeight);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, glhRenderbuffers[i]);
+
+        GLTexture *texture = frameTextures + i;
+        if (!texture->ID)
+        {
+            glGenTextures(1, &texture->ID);
+            texture->unit = textureUnit++;
+            texture->type = TEXTURETYPE_2D;
+        }
+        glActiveTexture(GL_TEXTURE0 + texture->unit);
+        glBindTexture(GL_TEXTURE_2D, texture->ID);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, nWidth, nHeight, 0, GL_RGBA, GL_FLOAT, nullptr);
+        texture->width = nWidth;
+        texture->height = nHeight;
+
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, texture->ID, 0);
+
+        assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+        glClearColor(0,0,0,0);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDrawBuffer(GL_COLOR_ATTACHMENT1);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        const GLenum dest_buffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+        glDrawBuffers(2, dest_buffers);
+    }
+
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
   }
 
   void StartFrame()
@@ -640,6 +707,10 @@ namespace Renderer
 
   void RenderFullscreenQuad()
   {
+    // Bind pong framebuffer to write to based on current frame number
+    currentFramebuffer = (currentFramebuffer + 1) % 2;
+    glBindFramebuffer(GL_FRAMEBUFFER, glhFramebuffers[currentFramebuffer]);
+
     glBindVertexArray(glhFullscreenQuadVA);
 
     glUseProgram(theShader);
@@ -670,6 +741,18 @@ namespace Renderer
       glDisableVertexAttribArray( position );
 
     glUseProgram(0);
+
+    // Blit framebuffer to back buffer
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    glBlitFramebuffer(0, 0, nWidth, nHeight, 0, 0, nWidth, nHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  }
+
+  Texture *GetFeedbackTexture()
+  {
+      return frameTextures + currentFramebuffer;
   }
 
   bool ReloadShader( const char * szShaderCode, int nShaderCodeSize, char * szErrorBuffer, int nErrorBufferSize )
@@ -727,14 +810,6 @@ namespace Renderer
       glProgramUniform2f( theShader, location, x, y );
     }
   }
-
-  struct GLTexture : public Texture
-  {
-    GLuint ID;
-    int unit;
-  };
-
-  int textureUnit = 0;
 
   Texture * CreateRGBA8Texture()
   {

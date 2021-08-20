@@ -764,6 +764,7 @@ int main(int argc, const char *argv[])
     Renderer::SetShaderTexture( "texFFTSmoothed", texFFTSmoothed );
     Renderer::SetShaderTexture( "texFFTIntegrated", texFFTIntegrated );
     Renderer::SetShaderTexture( "texPreviousFrame", texPreviousFrame );
+    Renderer::SetShaderTexture( "texFeedback", Renderer::GetFeedbackTexture() );
 
     for (std::map<std::string, Renderer::Texture*>::iterator it = textures.begin(); it != textures.end(); it++)
     {
