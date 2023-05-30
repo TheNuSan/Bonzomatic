@@ -1,0 +1,12 @@
+name: release-version
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        name: Bonzomatic Network  ${{ github.ref_name }}
+        files: |
+          ./package/**/*.zip

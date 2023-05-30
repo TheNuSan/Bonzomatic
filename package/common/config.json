@@ -1,0 +1,63 @@
+{
+  "font": {
+    "file": "ProFontWindows.ttf",
+    "size": 20
+  },
+  "codernamefont": {
+    "file": "ProFontWindows.ttf",
+    "size": 60
+  },
+  "window": {
+    "fullscreen": false,
+    "resizable": true,
+    "hideConsole": false,
+    "width": 1280,
+    "height": 720
+  },
+  "rendering": {
+    "fftSmoothFactor": 0.9,
+    "fftCapturePlaybackDevices": true, // If true, will capture from playback devices (desktop sound) instead of capture devices (mic)
+    "fftCaptureDeviceSearchString": "", // If not empty, will search a device name containing this string
+    "fftPeakNormalization": true, // If true, FFT will be normalized so as not to depend on the audio level
+    "fftPeakMinValue": 0.01, // Minimum audio peak that will be scaled
+    "fftPeakSmoothing": 0.995 // If audio peak drops, we smooth the transition to adjust it slowly
+  },
+  "textures": {
+    "texChecker": "textures/checker.png",
+    "texNoise": "textures/noise.png",
+    "texTex1": "textures/tex1.jpg",
+    "texTex2": "textures/tex2.jpg",
+    "texTex3": "textures/tex3.jpg",
+    "texTex4": "textures/tex4.jpg"
+  },
+  "gui": {
+    "outputHeight": 100,
+    "opacity": 0,
+    "texturePreviewWidth": 100,
+    "alwaysdisplaycodername": false // if network is enabled, decide if coder's name is always displayed even when hidding editor text
+  },
+  "network": {
+    "enabled": true,
+    //"serverURL": "ws://127.0.0.1:8000",
+    "serverURL": "ws://drone.alkama.com:9000/roomtest/guest",
+    "networkMode": "grabber", // can be sender or grabber
+    "udpateInterval": 0.3, // duration between two shader sending
+    "SyncTimeWithSender": true, // grabber will have same shader time than sender
+    "SendMidiControls": true, // sender will broadcast it's midi control's
+    "GrabMidiControls": true // grabber will apply recieved midi control's
+  },
+  // this section is if you want to customise colors to your liking
+  "theme": {
+    "text": "FFEFE1",
+    "comment": "B362FF",
+    "number": "FF628C",
+    "op": "CCEEFF",
+    "keyword": "FFFF60",
+    "type": "80BBFF",
+    "builtin": "FF9D00",
+    "preprocessor": "FF80FF",
+    "selection": "C06699CC",
+    "codername": "80FFFFFF",
+    "charBackground": "A0000000"
+  }
+}

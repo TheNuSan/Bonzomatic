@@ -1,0 +1,157 @@
+name: build-release
+on:
+  push:
+    tags:
+      - "v*.*.*"
+jobs:
+  build_release_w32:
+    runs-on: windows-2019
+    env:
+      NDI_SDK_DIR: c:/Program Files/NewTek/NDI 4 SDK/
+      BONZO_ZIPFILE: Bonzo_Network_${{ github.ref_name }}_x86.zip
+    steps:
+    - name: Download and install NDI SDK
+      run: |
+        curl ${{ secrets.NDI_SDK_URL }} -o ndisdk.exe
+        echo "Installing NDI SDK..."
+        ./ndisdk.exe /VERYSILENT /ALLUSERS
+        echo "Waiting for NDI SDK to finish installing..."
+        Wait-Process -Name "ndisdk"
+        echo "Done!"
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Create subdirs
+      run: |
+        mkdir ./glfw/
+        mkdir ./dx9/
+        mkdir ./dx11/
+    - name: CMake GLFW
+      working-directory: ./glfw
+      run: cmake -DBONZOMATIC_NDI="ON" -DBONZOMATIC_64BIT="NO" -DBONZOMATIC_WINDOWS_FLAVOR:STRING="GLFW" -G "Visual Studio 16 2019" -A Win32 ../
+    - name: Build GLFW
+      working-directory: ./glfw
+      run: cmake --build . --config Release
+    - name: CMake DX9
+      working-directory: ./dx9
+      run: cmake -DBONZOMATIC_NDI="ON" -DBONZOMATIC_64BIT="NO" -DBONZOMATIC_WINDOWS_FLAVOR:STRING="GLFW" -G "Visual Studio 16 2019" -A Win32 ../
+    - name: Build DX9
+      working-directory: ./dx9
+      run: cmake --build . --config Release
+    - name: CMake DX11
+      working-directory: ./dx11
+      run: cmake -DBONZOMATIC_NDI="ON" -DBONZOMATIC_64BIT="NO" -DBONZOMATIC_WINDOWS_FLAVOR:STRING="GLFW" -G "Visual Studio 16 2019" -A Win32 ../
+    - name: Build DX11
+      working-directory: ./dx11
+      run: cmake --build . --config Release
+    - name: Collect package
+      working-directory: ./package/w32_x86/
+      run: |
+        cp ../../glfw/Release/Bonzomatic.exe ./Bonzomatic_W32_GLFW.exe
+        cp ../../dx9/Release/Bonzomatic.exe ./Bonzomatic_W32_DX9.exe
+        cp ../../dx11/Release/Bonzomatic.exe ./Bonzomatic_W32_DX11.exe
+        cp "${{ env.NDI_SDK_DIR }}/Bin/x86/Processing.NDI.Lib.x86.dll" ./
+        cp ../../LICENSE ./
+        cp ../../README.md ./
+        cp -r ../common/* ./
+    - name: ZIP package
+      working-directory: ./package/w32_x86/
+      run: 7z a -r -tzip ${{env.BONZO_ZIPFILE}} * -mx9
+    - name: composite
+      uses: ./.github/actions/release-version
+  build_release_x64:
+    runs-on: windows-2019
+    env:
+      NDI_SDK_DIR: c:/Program Files/NewTek/NDI 4 SDK/
+      BONZO_ZIPFILE: Bonzo_Network_${{ github.ref_name }}_x64.zip
+    steps:
+    - name: Download and install NDI SDK
+      run: |
+        curl ${{ secrets.NDI_SDK_URL }} -o ndisdk.exe
+        echo "Installing NDI SDK..."
+        ./ndisdk.exe /VERYSILENT /ALLUSERS
+        echo "Waiting for NDI SDK to finish installing..."
+        Wait-Process -Name "ndisdk"
+        echo "Done!"
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Create subdirs
+      run: |
+        mkdir ./glfw/
+        mkdir ./dx9/
+        mkdir ./dx11/
+    - name: CMake GLFW
+      working-directory: ./glfw
+      run: cmake -DBONZOMATIC_NDI="ON" -DBONZOMATIC_64BIT="YES" -DBONZOMATIC_WINDOWS_FLAVOR:STRING="GLFW" -G "Visual Studio 16 2019" -A x64 ../
+    - name: Build GLFW
+      working-directory: ./glfw
+      run: cmake --build . --config Release
+    - name: CMake DX9
+      working-directory: ./dx9
+      run: cmake -DBONZOMATIC_NDI="ON" -DBONZOMATIC_64BIT="YES" -DBONZOMATIC_WINDOWS_FLAVOR:STRING="GLFW" -G "Visual Studio 16 2019" -A x64 ../
+    - name: Build DX9
+      working-directory: ./dx9
+      run: cmake --build . --config Release
+    - name: CMake DX11
+      working-directory: ./dx11
+      run: cmake -DBONZOMATIC_NDI="ON" -DBONZOMATIC_64BIT="YES" -DBONZOMATIC_WINDOWS_FLAVOR:STRING="GLFW" -G "Visual Studio 16 2019" -A x64 ../
+    - name: Build DX11
+      working-directory: ./dx11
+      run: cmake --build . --config Release
+    - name: Collect package
+      working-directory: ./package/w32_x64/
+      run: |
+        cp ../../glfw/Release/Bonzomatic.exe ./Bonzomatic_W64_GLFW.exe
+        cp ../../dx9/Release/Bonzomatic.exe ./Bonzomatic_W64_DX9.exe
+        cp ../../dx11/Release/Bonzomatic.exe ./Bonzomatic_W64_DX11.exe
+        cp "${{ env.NDI_SDK_DIR }}/Bin/x64/Processing.NDI.Lib.x64.dll" ./
+        cp ../../LICENSE ./
+        cp ../../README.md ./
+        cp -r ../common/* ./
+    - name: ZIP package
+      working-directory: ./package/w32_x64/
+      run: 7z a -r -tzip ${{env.BONZO_ZIPFILE}} * -mx9
+    - name: composite
+      uses: ./.github/actions/release-version
+  build_release_osx:
+    runs-on: macOS-latest
+    env:
+      BONZO_ZIPFILE: Bonzo_Network_${{ github.ref_name }}_macOs.zip
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Build
+      run: cmake . && cmake --build .
+    - name: Create subdirs # There are no mac-specific resources currently
+      run: mkdir ./package/macos/
+    - name: Collect package
+      working-directory: ./package/macos/
+      run: |
+        cp -r ../../Bonzomatic.app ./
+        cp ../../LICENSE ./
+        cp ../../README.md ./
+        cp -r ../common/* ./
+    - name: ZIP package
+      working-directory: ./package/macos/
+      run: 7z a -r -tzip ${{env.BONZO_ZIPFILE}} * -mx9
+    - name: composite
+      uses: ./.github/actions/release-version
+  build_launcher_win_x64:
+    runs-on: windows-2019
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Create build directory
+      working-directory: ./Launcher/
+      run: |
+        mkdir ./build/
+        mkdir ../package/launcher_win_x64/
+    - name: Build
+      working-directory: ./Launcher/build/
+      run: cmake -G "Visual Studio 16 2019" ../ && cmake --build . --config Release  
+    - name: Collect package
+      run: echo "Need to build glfw3.dll and glew32.dll and pack them"
+    - name: ZIP package
+      working-directory: ./package/launcher_win_x64/
+      run: 7z a -r -tzip Launcher_win_x64.zip ../../Launcher/build/Release/Launcher.exe -mx9
+    - name: composite1
+      uses: ./.github/actions/release-version
