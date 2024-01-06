@@ -203,8 +203,7 @@ namespace Network
 		// - verify size
 		// - non-ascii symbols ?
 		// - asynchronous update ?
-		data[size-1] = '\0'; // ensure we do have an end to the char string after "size" bytes
-		std::string TextJson = std::string((char*)data);
+		std::string TextJson = std::string((char*)data, size);
 		//printf("JSON: %s\n", TextJson.c_str());
 		jsonxx::Object NewShader;
     jsonxx::Object Data;
