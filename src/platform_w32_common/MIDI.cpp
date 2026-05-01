@@ -6,6 +6,9 @@
 namespace MIDI
 {
   int nCCValues[256];
+  float nCCTimers[256];
+  bool nCCBools[256];
+  float nCCSmooth[256];
   void CALLBACK MyMidiInProc( HMIDIIN hMidiIn, UINT wMsg, DWORD dwInstance, DWORD dwParam1, DWORD dwParam2) 
   {
     switch (wMsg) {
@@ -27,6 +30,10 @@ namespace MIDI
 
         //printf("[%08X] MM_MIM_DATA - TYPE: %X CHAN: %3d CTRL: %3d VAL: %3d\n",hMidiIn,nMIDIMessageType,nMIDIChannel,nMIDIControl,nMIDIValue);
         nCCValues[ nMIDIControl ] = nMIDIValue;
+        if (nMIDIValue > 0)
+        {
+          nCCBools[nMIDIControl] = !nCCBools[nMIDIControl];
+        }
       } break;
     }
   }
@@ -36,6 +43,9 @@ namespace MIDI
   bool Open()
   {
     ZeroMemory( &nCCValues, sizeof(int) * 256 );
+    ZeroMemory( &nCCTimers, sizeof(float) * 256);
+    ZeroMemory( &nCCBools, sizeof(bool) * 256);
+    ZeroMemory( &nCCSmooth, sizeof(float) * 256);
     nMIDIDeviceCount = midiInGetNumDevs();
 
     for (int i = 0; i < nMIDIDeviceCount; i++) 
@@ -65,4 +75,22 @@ namespace MIDI
     return nCCValues[cc] / 127.0f;
   }
 
+  float GetCCTimer(unsigned char cc, float deltatime)
+  {
+    nCCTimers[cc] += deltatime * 10.0f * nCCValues[cc] / 127.0f;
+    return nCCTimers[cc];
+  }
+
+  float GetCCBool(unsigned char cc, float deltatime)
+  {
+    if (nCCBools[cc])
+    {
+      nCCSmooth[cc] = min(nCCSmooth[cc] + deltatime * 10.0f, 1.0f);
+    }
+    else
+    {
+      nCCSmooth[cc] = max(nCCSmooth[cc] - deltatime * 10.0f, 0.0f);
+    }
+    return nCCSmooth[cc];
+  }
 };

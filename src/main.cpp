@@ -716,7 +716,8 @@ int main(int argc, const char *argv[])
     Renderer::SetShaderConstant( "v2Resolution", Renderer::nWidth, Renderer::nHeight );
 
     float fTime = Timer::GetTime();
-    Renderer::SetShaderConstant("fFrameTime", (fTime - fLastTimeMS) / 1000.0f);
+    float fDeltaTime = (fTime - fLastTimeMS) / 1000.0f;
+    Renderer::SetShaderConstant("fFrameTime", fDeltaTime);
     fLastTimeMS = fTime;
 
     if (Network::CanGrabMidiControls()) {
@@ -735,6 +736,8 @@ int main(int argc, const char *argv[])
       for (std::map<int, std::string>::iterator it = midiRoutes.begin(); it != midiRoutes.end(); it++)
       {
         Renderer::SetShaderConstant(it->second.c_str(), MIDI::GetCCValue(it->first));
+        Renderer::SetShaderConstant((it->second + "t").c_str(), MIDI::GetCCTimer(it->first, fDeltaTime));
+        Renderer::SetShaderConstant((it->second + "b").c_str(), MIDI::GetCCBool(it->first, fDeltaTime));
       }
     }
 

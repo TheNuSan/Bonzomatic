@@ -15,4 +15,6 @@ namespace MIDI
   bool Open();
   bool Close();
   float GetCCValue( unsigned char cc );
+  float GetCCTimer( unsigned char cc, float deltatime );
+  float GetCCBool( unsigned char cc, float deltatime );
 };
